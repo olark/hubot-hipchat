@@ -284,9 +284,6 @@ module.exports = class Connector extends EventEmitter
   # - `callback`: Function to be triggered: `function ()`
   onDisconnect: (callback) -> @on "disconnect", callback
 
-  # Emitted whenever the connector receives a topic change in a room
-  onTopic: (callback) -> @on "topic", callback
-
   # Emitted whenever the connector is invited to a room.
   #
   # `onInvite(callback)`
@@ -338,6 +335,11 @@ module.exports = class Connector extends EventEmitter
   # - `condition`: String or RegExp the message must match.
   # - `callback`: Function to be triggered: `function (fromJid, message)`
   onPrivateMessage: onMessageFor "privateMessage"
+
+  # Emitted whenever the connector receives a topic change in a room
+  #
+  # - `callback`: Function to be triggered: `function ()`
+  onTopic: (callback) -> @on "topic", callback
 
   onEnter: (callback) -> @on "enter", callback
 
