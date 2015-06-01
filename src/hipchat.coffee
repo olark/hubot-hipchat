@@ -1,4 +1,4 @@
-{Adapter, TextMessage, EnterMessage, LeaveMessage, User} = require "../../hubot"
+{Adapter, TextMessage, EnterMessage, LeaveMessage, TopicMessage, User} = require "hubot"
 HTTPS = require "https"
 {inspect} = require "util"
 Connector = require "./connector"
@@ -74,7 +74,9 @@ class HipChat extends Adapter
       token: process.env.HUBOT_HIPCHAT_TOKEN or null
       rooms: process.env.HUBOT_HIPCHAT_ROOMS or "All"
       rooms_blacklist: process.env.HUBOT_HIPCHAT_ROOMS_BLACKLIST or ""
+      rooms_join_public: process.env.HUBOT_HIPCHAT_JOIN_PUBLIC_ROOMS isnt "false"
       host: process.env.HUBOT_HIPCHAT_HOST or null
+      bosh: { url: process.env.HUBOT_HIPCHAT_BOSH_URL or null }
       autojoin: process.env.HUBOT_HIPCHAT_JOIN_ROOMS_ON_INVITE isnt "false"
       xmppDomain: process.env.HUBOT_HIPCHAT_XMPP_DOMAIN or null
       reconnect: process.env.HUBOT_HIPCHAT_RECONNECT isnt "false"
@@ -92,6 +94,13 @@ class HipChat extends Adapter
     @logger.info "Connecting HipChat adapter..."
 
     init = promise()
+
+    connector.onTopic (channel, from, message) =>
+      @logger.info "Topic change: " + message
+      author = getAuthor: => @robot.brain.userForName(from) or new User(from)
+      author.room = @roomNameFromJid(channel)
+      @receive new TopicMessage(author, message, 'id')
+
 
     connector.onDisconnect =>
       @logger.info "Disconnected from #{host}"
@@ -131,9 +140,10 @@ class HipChat extends Adapter
           @robot.brain.userForId user.id, user
 
       joinRoom = (jid) =>
-        blacklisted_room_jids = @options.rooms_blacklist.split ","
+        if jid and typeof jid is "object"
+          jid = "#{jid.local}@#{jid.domain}"
 
-        if jid in blacklisted_room_jids
+        if jid in @options.rooms_blacklist.split(",")
           @logger.info "Not joining #{jid} because it is blacklisted"
           return
 
@@ -153,7 +163,10 @@ class HipChat extends Adapter
             connector.getRooms (err, rooms, stanza) =>
               if rooms
                 for room in rooms
-                  joinRoom(room.jid)
+                  if !@options.rooms_join_public && room.guest_url != ''
+                    @logger.info "Not joining #{room.jid} because it is a public room"
+                  else
+                    joinRoom(room.jid)
               else
                 @logger.error "Can't list rooms: #{errmsg err}"
           # Join all rooms
